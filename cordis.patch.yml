@@ -1,0 +1,6 @@
+# The layer this bundle contributes to a profile. One row mounts the plugin;
+# the same package carries the browser half through `exports["./client"]` and
+# its `dsh.client` declaration, so the sidebar console needs no second row.
+- insert:
+    - id: jev-context
+      name: '@yirc99/dsh-jev-context'

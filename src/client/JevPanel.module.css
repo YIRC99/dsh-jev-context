@@ -1,0 +1,459 @@
+/* The trigger lives in the sidebar foot; the console is a ui-primitives Modal
+   portalled to the body, so nothing here positions or elevates it. */
+
+.layer {
+  display: flex;
+  align-items: center;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.badge:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  corner-shape: round;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.badge[data-jev-configured='true'][data-jev-enabled='true'] .dot {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.badge[data-jev-configured='false'] .dot {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.badgeLabel {
+  white-space: nowrap;
+}
+
+/* The primitive sizes its dialog for one short form; this console needs room
+   for a savings headline plus a two-column report. The doubled class outranks
+   the primitive's own rule without depending on stylesheet order. */
+.dialog.dialog {
+  width: min(1060px, 100%);
+  /* The report scrolls inside this dialog, an elevated surface, so the
+     scrollbar indirection is rebound here rather than on the scrolling child
+     (ui-theme styles/scrollbar.css owns the contract). */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.dialogContent {
+  min-height: 0;
+}
+
+/* The one number the console exists to show. */
+.hero {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 16px 20px 14px;
+  border-radius: 16px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-soft);
+}
+
+.heroLabel {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.heroValue {
+  font-size: 40px;
+  line-height: 48px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-success-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.heroUnit {
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.heroMeta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* A workspace can hold hundreds of sessions, so the column scrolls inside the
+   console rather than sizing it. The report beside it is bounded the same way,
+   which keeps the dialog's height independent of how much either holds. */
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0 4px 0 0;
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  list-style: none;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.more {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.more:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-height: min(52vh, 460px);
+  padding-right: 4px;
+  overflow-y: auto;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.group {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.session:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.session[data-jev-selected='true'] {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.sessionName {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionSaved {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.total {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.turns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.turn {
+  padding: 12px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.turnHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.turnTitle {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The saving is the point of the row, so it carries the weight. */
+.turnSaved {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.turn[data-jev-saved]:not([data-jev-saved='0']) .turnSaved {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.turn[data-jev-saved^='-'] .turnSaved {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+/* The message that opened the turn, held to two lines. */
+.turnRequest {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.turnWindow {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.turnGap {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.killedHead {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.killedNone {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.segments {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.segment {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/* The price of a shelved segment is what the console is counting. */
+.segmentTokens {
+  flex: none;
+  min-width: 62px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.segment[data-jev-action='pruned'] .segmentTokens {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.segment[data-jev-action='restored'] .segmentTokens {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.segmentLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmentScore {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.kept {
+  margin-top: 8px;
+}
+
+.kept > summary {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.notice {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* Configuration stays available without competing with the report. */
+.config {
+  margin-top: 16px;
+  border-top: 0.5px solid var(--dsw-alias-border-l1);
+  padding-top: 12px;
+}
+
+.configHead {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+/* One cell per field. The grid places whole fields, so a hint can never land
+   in a different column from the control it explains. */
+.configBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.keyRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.keyRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.inlineAction {
+  margin-left: 8px;
+}
