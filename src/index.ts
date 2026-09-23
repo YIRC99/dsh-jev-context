@@ -34,7 +34,7 @@ import {
   JEV_DEFAULT_TIMEOUT_MS,
 } from './jev.ts'
 import { jevContextProjection } from './projection.ts'
-import { supportsIgnorableLedger } from './ledger.ts'
+import { supportsIgnorableLedger, supportsPluginMessages } from './capability.ts'
 
 export * from './types.ts'
 export {
@@ -128,6 +128,17 @@ async function resolveApiKey(ctx: Context, config: ResolvedConfig): Promise<stri
  * @param config - composition-layer configuration; the user document overrides it.
  */
 export function apply(ctx: Context, config: JevContextConfig = {}): void {
+  // Every rewrite this plugin makes is a plugin-sourced `user/message`
+  // replacement. A harness without that source rejects each one, so mounting
+  // anyway would add a row that silently never changes a request: say why and
+  // stay inert instead.
+  if (!supportsPluginMessages()) {
+    ctx.logger.warn(
+      'jev-context: this harness does not accept a plugin-owned user/message source, so context selection '
+      + 'cannot rewrite the surface and stays off. Run a harness build that provides it.',
+    )
+    return
+  }
   // The ledger is the only record this plugin writes into a session log, and a
   // harness that cannot mark it ignorable would store it as a required event
   // that every reader without this plugin refuses. Say so once at mount rather
@@ -144,6 +155,15 @@ export function apply(ctx: Context, config: JevContextConfig = {}): void {
   ctx.sessionProjections.register(jevContextProjection(resolveConfig(config).retainedTurns))
   let current: () => JevContextConfig = () => config
   ctx.inject(['settings'], (settingsCtx) => {
+    // The configuration surface is optional: without the section API the
+    // composition-layer config still applies, so selection runs either way.
+    if (typeof (settingsCtx.settings as { installSection?: unknown }).installSection !== 'function') {
+      ctx.logger.warn(
+        'jev-context: this harness does not expose the settings section API, '
+        + 'so the configuration panel stays hidden and the composition config applies as written.',
+      )
+      return
+    }
     settingsCtx.settings.installSection(ctx, JEV_CONTEXT_SETTINGS_NAMESPACE, Config, config, {
       setSource: (source) => { current = source },
       // The section is projected per decision, so a committed change reaches
