@@ -49,7 +49,8 @@
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json",
     "typecheck:local": "tsc -p tsconfig.local.json",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
