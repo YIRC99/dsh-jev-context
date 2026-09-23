@@ -62,10 +62,22 @@ export const inject = ['slots', 'locale']
 /**
  * Register the dictionaries and, once the settings scope exists, the sidebar
  * foot row.
+ *
+ * Nothing here may take the entry down: a failed client entry fails the whole
+ * web boot, so a harness that already provides a JEV row, or a second copy of
+ * this plugin, must cost the row and nothing more.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-jev-context: dictionaries')
+  try {
+    ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-jev-context: dictionaries')
+  } catch (error) {
+    // A locale namespace has exactly one owner. Another plugin may already hold
+    // this one — a harness shipping its own JEV context row, or a second copy
+    // of this plugin — and failing here would fail the boot with it.
+    console.warn(`jev-context: locale namespace "${NS}" is already owned; the sidebar row stays off`, error)
+    return
+  }
 
   ctx.inject(['settingsScope'], (settingsCtx) => {
     const scope = settingsCtx.settingsScope.bind<JevSection>({ namespace: JEV_CONTEXT_NAMESPACE })
