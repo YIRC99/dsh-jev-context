@@ -116,6 +116,29 @@ lets the turn proceed.
   lives only in a code block or a tool body is invisible to the decision.
   `digestChars` widens the window without changing the principle.
 
+## Local development
+
+```sh
+pnpm install
+pnpm build          # lib/index.js (Node half) + lib/client.js (browser half)
+pnpm typecheck      # against the harness version in devDependencies
+```
+
+Installing a *local checkout* into a profile copies it: `dsh plugin add
+file:...` does not follow later rebuilds, and re-running `add` reports "already
+up to date" while the profile keeps the old copy. Remove and add again after a
+rebuild:
+
+```sh
+dsh plugin --profile <name> remove @yirc99/dsh-jev-context
+dsh plugin --profile <name> add file:/absolute/path/to/dsh-jev-context
+```
+
+`exports` must list `./cordis.patch.yml`. A package whose `exports` map omits it
+is installed, listed in the profile's bundle stack, and then **silently skipped**
+when the profile composes: the row never appears in `--dump-config` and nothing
+reports why.
+
 ## License
 
 MIT
