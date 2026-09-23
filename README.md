@@ -96,10 +96,16 @@ lets the turn proceed.
 
 ## Known limitations
 
-- **Minimum harness version.** The plugin uses harness APIs that are not in every
-  release: a plugin-owned `user/message` source, `SettingsForms.installSection`,
-  and the `ignorable` write path above. `pnpm typecheck` against a published
-  harness reports exactly which of them a given version lacks.
+- **It speaks both session-format generations.** The marker messages it injects
+  follow the running harness: `kind: 'plugin'` with the package name on format 3
+  and earlier, and this package's own `kind: 'jev-context'` on format 4, which
+  refuses the shared kind. `SESSION_FORMAT_VERSION` decides, so a session stays
+  loadable whichever build wrote it. Both generations validate a source against
+  a closed set, which is why the shape cannot be a compile-time constant.
+- **Features that need a newer build degrade, and say so.** The settings panel
+  needs `SettingsForms.installSection`, and the ledger needs the `ignorable`
+  write path described above. Where a harness lacks one, the plugin reports it
+  once at mount and runs without that piece; context selection needs neither.
 - **A rewrite invalidates prompt-cache reuse** from the oldest changed segment,
   so alternating between two topics can cost more in cache misses than the
   shelved tokens save. Selection is per turn; nothing changes within a turn.

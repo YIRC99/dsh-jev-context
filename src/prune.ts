@@ -17,7 +17,8 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-compaction'
-import { MARKER_PLUGIN, surfaceEvent } from './segments.ts'
+import { surfaceEvent } from './segments.ts'
+import { markerSource } from './source.ts'
 import { pruneSummary, renderPruneMarker, renderRecallMarker } from './render.ts'
 import type { ContextSegment } from './types.ts'
 
@@ -89,12 +90,9 @@ export function pruneSegment(
 ): void {
   const replacement = createUserMessage({
     content: [{ type: 'text', text: renderPruneMarker(segment) }],
-    source: {
-      kind: 'plugin',
-      plugin: MARKER_PLUGIN,
-      form: 'notice',
-      summary: pruneSummary(segment),
-    },
+    // The running harness's format generation decides which source shape is
+    // legal, so no single compile-time source type describes both branches.
+    source: markerSource({ form: 'notice', summary: pruneSummary(segment) }) as UserMessage['source'],
   })
   replaceSpan(session, segment.spanSeqs, replacement, citations(segment.spanSeqs, segment.sourceSeqs), estimate)
 }
@@ -115,7 +113,7 @@ export function recallSegment(
 ): void {
   const replacement = createUserMessage({
     content: [{ type: 'text', text: renderRecallMarker(segment, events) }],
-    source: { kind: 'plugin', plugin: MARKER_PLUGIN, form: 'recall' },
+    source: markerSource({ form: 'recall' }) as UserMessage['source'],
   })
   replaceSpan(session, segment.spanSeqs, replacement, citations(segment.spanSeqs, segment.sourceSeqs), estimate)
 }

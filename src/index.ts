@@ -34,7 +34,7 @@ import {
   JEV_DEFAULT_TIMEOUT_MS,
 } from './jev.ts'
 import { jevContextProjection } from './projection.ts'
-import { supportsIgnorableLedger, supportsPluginMessages } from './capability.ts'
+import { supportsIgnorableLedger } from './capability.ts'
 
 export * from './types.ts'
 export {
@@ -51,7 +51,15 @@ export {
   JevError,
 } from './jev.ts'
 export type { JevCallOptions, JevErrorCode } from './jev.ts'
-export { isMarkerEvent, MARKER_PLUGIN, readSegments } from './segments.ts'
+export { isMarkerEvent, readSegments } from './segments.ts'
+export {
+  MARKER_KIND,
+  isMarkerSource,
+  markerFormOf,
+  markerSource,
+  usesProducerOwnedSources,
+} from './source.ts'
+export type { MarkerFields, MarkerForm } from './source.ts'
 export { resolveOutcomes, selectContext } from './engine.ts'
 export type { SelectionInput } from './engine.ts'
 export {
@@ -128,17 +136,6 @@ async function resolveApiKey(ctx: Context, config: ResolvedConfig): Promise<stri
  * @param config - composition-layer configuration; the user document overrides it.
  */
 export function apply(ctx: Context, config: JevContextConfig = {}): void {
-  // Every rewrite this plugin makes is a plugin-sourced `user/message`
-  // replacement. A harness without that source rejects each one, so mounting
-  // anyway would add a row that silently never changes a request: say why and
-  // stay inert instead.
-  if (!supportsPluginMessages()) {
-    ctx.logger.warn(
-      'jev-context: this harness does not accept a plugin-owned user/message source, so context selection '
-      + 'cannot rewrite the surface and stays off. Run a harness build that provides it.',
-    )
-    return
-  }
   // The ledger is the only record this plugin writes into a session log, and a
   // harness that cannot mark it ignorable would store it as a required event
   // that every reader without this plugin refuses. Say so once at mount rather

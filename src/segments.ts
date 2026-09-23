@@ -14,10 +14,8 @@
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionSeq } from '@deepseek-ai/dsh-session'
+import { isMarkerSource, markerFormOf } from './source.ts'
 import type { ContextSegment, SegmentDigest } from './types.ts'
-
-/** Plugin id this package stamps on every marker message it appends. */
-export const MARKER_PLUGIN = 'jev-context'
 
 /** Prefix a recalled transcript puts on a failed tool result. */
 const TOOL_ERROR_LABEL = '工具报错'
@@ -29,8 +27,7 @@ const TOOL_ERROR_LABEL = '工具报错'
  */
 export function isMarkerEvent(event: SessionEvent): boolean {
   if (event.type !== 'user/message') return false
-  const source = event.data.source
-  return source.kind === 'plugin' && source.plugin === MARKER_PLUGIN
+  return isMarkerSource(event.data.source)
 }
 
 /**
@@ -47,16 +44,15 @@ export function isMarkerEvent(event: SessionEvent): boolean {
  * `catalog` (the skill catalog), `recall` (a session reference), `notice` (a
  * subagent settlement, a webhook delivery), `relay` (an agent message) — while
  * every work-initiating kind declares none: `user`, `goal`, `team-message`.
- * A plugin-injected message is context by construction whatever it declares,
- * so `kind: 'plugin'` is excluded on its own.
+ * The plugin's own markers are excluded by identity as well, so neither
+ * generation's source shape can be mistaken for work.
  * @param event - the surface event to classify.
  * @returns whether the event begins a segment.
  */
 export function opensSegment(event: SessionEvent): boolean {
   if (event.type !== 'user/message') return false
   const source = event.data.source as { kind: string; form?: unknown }
-  // A plugin-injected message is context by construction, whatever it declares.
-  if (source.kind === 'plugin') return false
+  if (isMarkerSource(source)) return false
   // The injection kinds all declare a `ContextFormed` form; work-initiating
   // messages — `user`, `goal`, a relayless `agent-message` — declare none.
   return source.form === undefined
@@ -69,8 +65,7 @@ export function opensSegment(event: SessionEvent): boolean {
  */
 export function isPruneMarker(event: SessionEvent): boolean {
   if (event.type !== 'user/message') return false
-  const source = event.data.source
-  return source.kind === 'plugin' && source.plugin === MARKER_PLUGIN && source.form === 'notice'
+  return markerFormOf(event.data.source) === 'notice'
 }
 
 /** Collapse whitespace and bound one text value. */
