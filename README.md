@@ -139,6 +139,12 @@ is installed, listed in the profile's bundle stack, and then **silently skipped*
 when the profile composes: the row never appears in `--dump-config` and nothing
 reports why.
 
+The published package ships JavaScript only. Type declarations would need the
+harness APIs this plugin is written against to be present in the versions
+`devDependencies` pins, and `pnpm typecheck` reports exactly which of them a
+given version lacks; until that resolves, `types` stays out of the manifest
+rather than pointing at a file the tarball does not contain.
+
 ## License
 
 MIT
