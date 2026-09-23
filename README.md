@@ -1,39 +1,43 @@
----
-description: "JEV-scored conversation segmentation for the DeepSeek Harness: decide per turn which earlier segments a request needs, shelve the rest behind a one-line marker, and recall them when the topic returns."
-kind: "package-reference"
----
+# dsh-jev-context
 
-# @deepseek-ai/dsh-jev-context
+JEV-scored context selection for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-English | [中文](README.zh.md)
+Every turn pays for the whole conversation. This plugin keeps the model-visible
+history to the earlier segments a turn actually needs: on each turn's first step
+it cuts the session surface where each unit of work began, asks the JEV decision
+service (TypeSafe System One, about one second and $0.04 per million input
+tokens) for one relevance probability per candidate segment, replaces the
+irrelevant ones with a one-line omission marker, and recalls a shelved segment
+when its topic returns.
 
-## Summary
+The log is never edited. A shelved segment stays readable in the session log, so
+recall re-materializes it, and every decision is recorded as a durable
+`context-jev/turn` event that a session projection folds into the sidebar
+console.
 
-This package keeps the model-visible conversation to the earlier segments a turn actually needs. On each turn's first step it cuts the session surface where each unit of work began, asks the JEV decision service (TypeSafe System One, ~1s and ~$0.04 per million input tokens) for one relevance probability per candidate segment, replaces the irrelevant ones with a one-line omission marker, and recalls a shelved segment when its topic returns. The log is never edited: a shelved segment stays readable, so recall re-materializes it. Every decision is a durable `context-jev/turn` event, folded by the `jevContext` projection for the browser ledger.
+## Install
 
-## Table of Contents
+Inside the harness, from the plugin market (Settings → Plugins → Market), or:
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
-
------
-
-<a id="use-this-package"></a>
-## Use this package
-
-Mount the row and configure an API key. The key is the only required input; without one the plugin logs a `no-key` ledger entry per turn and leaves the surface alone.
-
-```yaml
-- id: jev-context
-  name: '@deepseek-ai/dsh-jev-context'
+```sh
+dsh plugin --profile web add @yirc99/dsh-jev-context
 ```
 
-The key resolves in this order: the `apiKey` setting, the credential reference named by `apiKeyEnv` (default `TYPESAFE_API_KEY`), then the launching environment. The settings namespace is `jev-context`; `apiKey` is a `role('secret')` field, so a remote settings read reports only whether one is stored.
+Then restart `dsh web` and open the JEV row at the foot of the sidebar.
+Installing the package is enough: it declares both its configuration layer
+(`cordis.patch.yml`) and its browser half, so no second row or manual
+`cordis.yml` edit is needed.
 
-### Policy knobs
+## Configure
+
+The only required input is an API key. Without one the plugin records a `no-key`
+ledger entry per turn and leaves the surface alone.
+
+The key resolves in this order: the `apiKey` setting, the credential reference
+named by `apiKeyEnv` (default `TYPESAFE_API_KEY`), then the launching
+environment. The settings namespace is `jev-context`; `apiKey` is a
+`role('secret')` field, so a remote settings read reports only whether one is
+stored.
 
 | Field | Default | Meaning |
 | --- | --- | --- |
@@ -45,65 +49,67 @@ The key resolves in this order: the `apiKey` setting, the credential reference n
 | `retainedTurns` | `12` | Ledger records the browser view retains; read at mount. |
 | `model`, `baseURL`, `timeoutMs`, `digestChars` | `jev-1.13.0`, the System One base, 20s, 320 | Decision service identity and bounds. |
 
------
+## What it does to your session log
 
-<a id="understand-the-implementation"></a>
-## Understand the implementation
+One thing is worth stating plainly, because it is the only thing this plugin
+writes that other tools read back.
 
-<details>
-<summary>Implementation internals — click to expand</summary>
+The ledger event type `context-jev/turn` is declared by this package, so a
+harness that does not install the plugin has it outside its generated known-type
+vocabulary — and such a harness refuses to load a session log containing an
+unrecognized event it has no reason to trust. The record is therefore appended
+with the harness's `ignorable` marker, which states that skipping it cannot
+change how the rest of the log is read.
 
-A **segment** is a maximal run of surface nodes beginning where the harness recorded a new unit of work — a human prompt, a goal round, or a teammate message. Segmentation reads the current surface, so it survives this plugin's own rewrites: an omission marker and a recall marker are themselves segment starts, and each marker cites the original nodes it shadowed in `sourceEventSeqs`. Filtering marker seqs out of those citations recovers a segment's identity and digest after any number of prune/recall cycles.
+That marker is only written by a harness that supports it. On an older harness
+the plugin detects the gap at mount, logs one warning, and **leaves the ledger
+off** rather than storing records your own harness would then refuse to load.
+Context selection itself is unaffected.
 
-Both rewrites ride the shared shadow-price protocol — a `compaction/prune` event immediately followed by its replacement, with no yield between them — so the context-pressure projection subtracts the shadowed range's price exactly and the reported saving is the number the meter itself uses. A rewrite is one `user/message` replacement; `assistant/message` cannot cite source events, so a faithful node-by-node restore is not expressible and a recalled segment returns as a role-labelled transcript instead.
+Everything else the plugin does is a normal surface rewrite: a `compaction/prune`
+event immediately followed by its replacement, with no yield between them, which
+is the protocol the harness's own compaction uses. The original bytes stay in the
+log.
 
-The engine runs on `agent/pre-step`, which the loop dispatches before `step/start` and before `buildRequest()` derives history — the same timing `dsh-compaction-basic` uses. Only a turn's first step selects; later steps of one turn share a request prefix and re-scoring them would churn the surface between two requests. Every failure is contained: an unreachable service, a malformed answer set, or a rejected append leaves the surface unchanged, records why, and lets the turn proceed.
+## How it works
 
-</details>
+A **segment** is a maximal run of surface nodes beginning where the harness
+recorded a new unit of work — a human prompt, a goal round, or a teammate
+message. Segmentation reads the current surface, so it survives this plugin's own
+rewrites: an omission marker and a recall marker are themselves segment starts,
+and each marker cites the original nodes it shadowed. Filtering marker sequences
+out of those citations recovers a segment's identity and digest after any number
+of prune/recall cycles.
 
------
+Both rewrites ride the shared shadow-price protocol, so the context-pressure
+projection subtracts the shadowed range's price exactly and the reported saving
+is the number the meter itself uses. A rewrite is one `user/message`
+replacement; `assistant/message` cannot cite source events, so a recalled
+segment returns as a role-labelled transcript rather than as its original nodes.
 
-<a id="model-experience"></a>
-## Model Experience
+The engine runs on `agent/pre-step`, before the request is built. Only a turn's
+first step selects: later steps of one turn share a request prefix, and
+re-scoring them would churn the surface between two requests that differ only in
+their tail. Every failure is contained — an unreachable service, a malformed
+answer set, or a rejected append leaves the surface unchanged, records why, and
+lets the turn proceed.
 
-### Pruned and recalled conversation segments
+## Known limitations
 
-#### What the model sees
+- **Minimum harness version.** The plugin uses harness APIs that are not in every
+  release: a plugin-owned `user/message` source, `SettingsForms.installSection`,
+  and the `ignorable` write path above. `pnpm typecheck` against a published
+  harness reports exactly which of them a given version lacks.
+- **A rewrite invalidates prompt-cache reuse** from the oldest changed segment,
+  so alternating between two topics can cost more in cache misses than the
+  shelved tokens save. Selection is per turn; nothing changes within a turn.
+- **The decision service is a network dependency on the turn's critical path**,
+  bounded by `timeoutMs`. A failed call costs the turn one round trip and
+  nothing else.
+- **Relevance comes from segment digests**, not full content, so relevance that
+  lives only in a code block or a tool body is invisible to the decision.
+  `digestChars` widens the window without changing the principle.
 
-Once a turn's first step begins, the request carries the session's earlier segments except those the decision service scored below `threshold`, each replaced in place by one omission marker naming its topic and stating that the segment can be recalled. A segment that was shelved and is now relevant returns as a recall marker carrying a role-labelled transcript of its original content. An omitted segment reads as `[更早的对话已省略 · 主题：…]` plus one sentence saying the content still exists and asking the model to say so if it needs the segment; a recalled one reads as `[更早的对话已重新载入 · 主题：…]` followed by the original text, unedited, labelled `【用户】`/`【助手】`/`【工具】`, with a failed tool result prefixed `[工具报错]`. The most recent `keepRecentSegments` segments are never rewritten.
+## License
 
-#### Token effect
-
-A shelved segment costs its marker (roughly 50 tokens) instead of its content, so the saving is bounded below by `minSegmentTokens`. Each decision costs one JEV call whose input is the digest set; the pricing is recorded on the turn's ledger event alongside the heuristic totals before and after. A recall spends tokens to bring content back; a turn whose recalls outweigh its prunes reports a negative `tokensSaved`.
-
-#### KV Cache effect
-
-Rewriting a segment invalidates reuse from the first changed token, so a topic switch costs a prefix miss from the oldest changed segment onward. Unchanged segments before that point stay eligible, and a turn that changes nothing leaves the prefix byte-identical.
-
-## Known Limitations and Deferred Work
-
-<a id="known-limitations-and-deferred-work"></a>
-
-These limits define when the current selector is a poor fit. They are package constraints, not a comparison against other context strategies.
-
-- **Relevance is judged from digests, not from the content itself** — the decision service sees the opening request text, a bounded reply excerpt, and tool names. A segment whose relevance lives only in a code block, a file path, or a tool result body can be scored irrelevant and shelved. Raising `digestChars` widens the window without changing the principle.
-- **A recalled segment is not restored as its original nodes** — the surface admits only a `user/message` as a multi-node replacement, and `assistant/message` cannot cite source events, so recall returns a transcript in one user-role node. Roles survive inside the text, not as provider roles.
-- **A cached request prefix is expensive to rewrite, and this is now measured** — a rewrite invalidates reuse from the oldest changed segment. Across 16 local session logs the provider served 99.5% of billed input from cache; a cache read costs $0.003 per million against $0.15 uncached, so re-billing one token costs 50 times what shelving it saves. Eleven rewrites added $0.42 of extra billing, the largest re-billing 722,713 tokens in a single request for $0.106. A prune repays its own invalidation only after `49 x (tokens after the break) / (tokens removed)` further requests: removing 150,000 tokens from a 300,000-token prompt needs 98 more, and removing 20,000 needs 735. Breaking the prefix late in the context costs far less than breaking it early — the opposite of where relevance-based selection naturally cuts.
-- **Recall is not a model-initiated act** — the model can state that it needs a shelved segment, but only the next turn's decision can actually bring it back. The marker says so rather than implying an available tool.
-- **The decision service is a network dependency** — a call blocks that turn's first step for its latency (about one second in the design's measurements). A timeout of `timeoutMs` abandons the decision and leaves the surface unchanged.
-- **A single-topic session prunes nothing, and that is the design** — measured over a real 3,500-event session, every segment scored 0.62–0.82 against the newest request, so all of them stayed loaded. Relevance separates *topics*, not "this turn needs this part of one topic"; within one long subject there is nothing to cut that the turn can afford to lose. The saving appears when a session genuinely changes subject, and then it is large — the same session held single segments costing 57,000 and 382,000 heuristic tokens.
-- **Consecutive goal rounds can carry the same label** — the caption is the segment's opening request text, and every goal round opens by repeating the objective. The per-row action, relevance, and token count still distinguish them; the caption does not.
-- **Only the newest candidates are judged when the cap binds** — `maxSegmentsPerDecision` (40 by default) limits one call, and the cap keeps the newest candidates. In a session with more eligible segments than that, an older shelved segment stops being asked about and therefore cannot be recalled. Raising the cap costs decision-service input tokens.
-- **`retainedTurns` and `digestChars` are read from the composition layer at mount** — the projection's fold state is persisted and versioned, so changing the ledger bound takes effect on reload rather than live.
-
-<a id="dev-note"></a>
-### Dev Note
-
-<details>
-<summary>Working context for maintainers — click to expand</summary>
-
-The relevance question is derived from the JEV demo at `D:\code_file\jev_demo`, which established that one `noul` question per candidate separates a relevant segment from unrelated chit-chat in about one second. Measured against the live service through this package's own client, over a three-topic session: a request continuing one topic scored it 0.96 and the other two 0.02 and 0.08; a request asking for the whole conversation scored all three 0.96–0.98. Every relevant segment lands above 0.84 and every irrelevant one below 0.08, so the default `threshold` of 0.5 sits in an empty band rather than near a boundary. One call costs about 1,085 input tokens (roughly $0.000046) and 450–1,100 ms.
-
-</details>
-
-**Runtime invariant:** No invariant companion is published because every relationship this package owns is already checked at its append site: the session surface fold rejects a replacement whose citations miss a shadowed node or whose range left the surface, and the shadow-price protocol is enforced by the token-meter fold. An independent observation would restate those checks rather than catch a divergence between them.
+MIT
