@@ -47,71 +47,83 @@ export interface JevPanelFace {
   onClearKey: () => Promise<void>
 }
 
-/** Required services: the slot registry, the dictionaries, and the settings scope. */
-export const inject = ['slots', 'locale', 'settingsScope']
+/**
+ * Required services: the slot registry and the dictionaries.
+ *
+ * The settings scope is deliberately NOT here. It arrives from the client
+ * settings package, which not every harness generation ships, and an entry
+ * waiting on a service that never appears stays pending — which blocks the
+ * entire web boot, not just this row. The scope is taken through `ctx.inject`
+ * below instead, so a harness without it keeps a working web app and simply
+ * has no JEV row.
+ */
+export const inject = ['slots', 'locale']
 
 /**
- * Register the dictionaries and the sidebar foot row.
+ * Register the dictionaries and, once the settings scope exists, the sidebar
+ * foot row.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-jev-context: dictionaries')
 
-  const scope = ctx.settingsScope.bind<JevSection>({ namespace: JEV_CONTEXT_NAMESPACE })
-  const mirror = ctx.settingsScope.describe()
-  const panel = createJevPanelStore()
+  ctx.inject(['settingsScope'], (settingsCtx) => {
+    const scope = settingsCtx.settingsScope.bind<JevSection>({ namespace: JEV_CONTEXT_NAMESPACE })
+    const mirror = settingsCtx.settingsScope.describe()
+    const panel = createJevPanelStore()
 
-  const publish = (notice?: JevNotice): void => {
-    const snapshot = scope.getSnapshot()
-    const section = snapshot.value ?? {}
-    // `secrets` is the only channel a redacted secret field leaves behind: the
-    // host states that a value is stored, never what it is.
-    const secrets = mirror.getSnapshot().view?.namespaces
-      .find(view => view.ns === JEV_CONTEXT_NAMESPACE)?.secrets
-    panel.set({
-      status: snapshot.status,
-      writable: snapshot.writable,
-      enabled: section.enabled ?? true,
-      configured: secrets?.some(secret => secret.set === true) ?? false,
-      threshold: section.threshold ?? 0.5,
-      keepRecentSegments: section.keepRecentSegments ?? 1,
-      notice: notice ?? panel.getSnapshot().notice,
-    })
-  }
-
-  ctx.effect(() => scope.subscribe(() => { publish() }), 'ui-jev-context: section changes')
-  ctx.effect(() => mirror.subscribe(() => { publish() }), 'ui-jev-context: credential changes')
-  publish()
-
-  /** Write one field and report the outcome the host actually landed. */
-  const write = async (field: string, value: unknown): Promise<void> => {
-    if (!scope.getSnapshot().writable) {
-      publish({ key: 'notice.readonly' })
-      return
+    const publish = (notice?: JevNotice): void => {
+      const snapshot = scope.getSnapshot()
+      const section = snapshot.value ?? {}
+      // `secrets` is the only channel a redacted secret field leaves behind: the
+      // host states that a value is stored, never what it is.
+      const secrets = mirror.getSnapshot().view?.namespaces
+        .find(view => view.ns === JEV_CONTEXT_NAMESPACE)?.secrets
+      panel.set({
+        status: snapshot.status,
+        writable: snapshot.writable,
+        enabled: section.enabled ?? true,
+        configured: secrets?.some(secret => secret.set === true) ?? false,
+        threshold: section.threshold ?? 0.5,
+        keepRecentSegments: section.keepRecentSegments ?? 1,
+        notice: notice ?? panel.getSnapshot().notice,
+      })
     }
-    await scope.set(field, value)
-    const section = scope.getSnapshot().value as Record<string, unknown> | undefined
-    const landed = section !== undefined && section[field] === value
-    publish(landed ? { key: 'notice.saved' } : { key: 'notice.error', params: { message: String(field) } })
-  }
 
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
-    id: 'jev-context',
-    // After the Cordis plugin row: process work reads before context policy.
-    order: 20,
-    locale: NS,
-    inject: (): JevPanelFace => ({
-      hooks: { panel },
-      onWrite: async (field, value) => { await write(field, value) },
-      onClearKey: async () => {
-        if (!scope.getSnapshot().writable) {
-          publish({ key: 'notice.readonly' })
-          return
-        }
-        await scope.unset('apiKey')
-        publish({ key: 'notice.saved' })
-      },
-    }),
-  }, JevPanel))
+    ctx.effect(() => scope.subscribe(() => { publish() }), 'ui-jev-context: section changes')
+    ctx.effect(() => mirror.subscribe(() => { publish() }), 'ui-jev-context: credential changes')
+    publish()
+
+    /** Write one field and report the outcome the host actually landed. */
+    const write = async (field: string, value: unknown): Promise<void> => {
+      if (!scope.getSnapshot().writable) {
+        publish({ key: 'notice.readonly' })
+        return
+      }
+      await scope.set(field, value)
+      const section = scope.getSnapshot().value as Record<string, unknown> | undefined
+      const landed = section !== undefined && section[field] === value
+      publish(landed ? { key: 'notice.saved' } : { key: 'notice.error', params: { message: String(field) } })
+    }
+
+    ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+      name: 'sidebar.footer.action',
+      id: 'jev-context',
+      // After the Cordis plugin row: process work reads before context policy.
+      order: 20,
+      locale: NS,
+      inject: (): JevPanelFace => ({
+        hooks: { panel },
+        onWrite: async (field, value) => { await write(field, value) },
+        onClearKey: async () => {
+          if (!scope.getSnapshot().writable) {
+            publish({ key: 'notice.readonly' })
+            return
+          }
+          await scope.unset('apiKey')
+          publish({ key: 'notice.saved' })
+        },
+      }),
+    }, JevPanel))
+  })
 }
